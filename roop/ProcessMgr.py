@@ -2,7 +2,7 @@ import os
 import cv2 
 import numpy as np
 import psutil
-
+import time
 from roop.ProcessOptions import ProcessOptions
 
 from roop.face_util import get_first_face, get_all_faces, rotate_image_180, rotate_anticlockwise, rotate_clockwise, clamp_cut_values
@@ -26,13 +26,12 @@ class FrameQueueItem:
 
 def queue_get_iter(queue: Queue) -> Generator:
     while True:
+        while queue.unfinished_tasks > queue.maxsize:
+            time.sleep(0.1)
         item = queue.get()
-        try:
-            if item is None:
-                break
-            yield item
-        finally:
-            queue.task_done()
+        if item is None:
+            break
+        yield item
 
 class gradio_tqdm(tqdm):
     def __init__(self, iter, progress_cb: Callable, *args, **kwargs):
@@ -190,10 +189,12 @@ class ProcessMgr():
 
         def proc_frame(iter: Iterator[FrameQueueItem]) -> None:
             nonlocal writer_queue
+            nonlocal reader_queue
             if not roop.globals.processing:
                 return
             res_img = self.process_frame(iter.frame)
             writer_queue.put(FrameQueueItem(idx=iter.idx, frame=res_img))
+            reader_queue.task_done()
 
         progress_bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]'
         tqdm_thread_map(proc_frame, queue_get_iter(reader_queue), total=frame_count, desc="Processing", unit="frames", dynamic_ncols=True, bar_format=progress_bar_format, max_workers=threads, tqdm_class=gradio_tqdm, progress_cb=self.update_progress)
