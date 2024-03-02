@@ -178,7 +178,7 @@ def get_processing_plugins(use_clip):
     return processors
 
 
-def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0):
+def live_swap(frame, swap_mode, use_clip, clip_text, selected_target, selected_index = 0 ):
     global process_mgr
 
     if frame is None:
@@ -189,7 +189,7 @@ def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0):
     
     if len(roop.globals.INPUT_FACESETS) <= selected_index:
         selected_index = 0
-    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, swap_mode, selected_index, clip_text)
+    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, swap_mode, selected_index, selected_target, clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACESETS, roop.globals.TARGET_FACES, options)
     newframe = process_mgr.process_frame(frame)
     if newframe is None:
@@ -197,14 +197,14 @@ def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0):
     return newframe
 
 
-def preview_mask(frame, clip_text):
+def preview_mask(frame, clip_text, selected_index, selected_target):
     import numpy as np
     global process_mgr
     
     maskimage = np.zeros((frame.shape), np.uint8)
     if process_mgr is None:
         process_mgr = ProcessMgr(None)
-    options = ProcessOptions("mask_clip2seg", roop.globals.distance_threshold, roop.globals.blend_ratio, "None", 0, clip_text)
+    options = ProcessOptions("mask_clip2seg", roop.globals.distance_threshold, roop.globals.blend_ratio, "None", selected_index, selected_target, clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACESETS, roop.globals.TARGET_FACES, options)
     maskprocessor = next((x for x in process_mgr.processors if x.processorname == 'clip2seg'), None)
     return process_mgr.process_mask(maskprocessor, frame, maskimage)
@@ -213,7 +213,7 @@ def preview_mask(frame, clip_text):
 
 
 
-def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_method, progress, selected_index = 0) -> None:
+def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_method, progress, selected_target, selected_index = 0) -> None:
     global clip_text, process_mgr
 
     roop.globals.processing = True
@@ -251,7 +251,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
 
     if len(roop.globals.INPUT_FACESETS) <= selected_index:
         selected_index = 0
-    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, roop.globals.face_swap_mode, selected_index, new_clip_text)
+    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, roop.globals.face_swap_mode, selected_index, selected_target, new_clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACESETS, roop.globals.TARGET_FACES, options)
 
     if(len(imagefiles) > 0):

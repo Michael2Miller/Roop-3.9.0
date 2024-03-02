@@ -320,12 +320,13 @@ class ProcessMgr():
                     del face
             
             elif self.options.swap_mode == "selected":
-                for i,tf in enumerate(self.target_face_datas):
+                if 0 <= self.options.selected_target < len(self.target_face_datas):
+                    tf = self.target_face_datas[self.options.selected_target]
                     for face in faces:
-                        if compute_cosine_distance(tf.embedding, face.embedding) <= self.options.face_distance_threshold:
-                            if i < len(self.input_face_datas):
-                                temp_frame = self.process_face(i, face, temp_frame)
-                                num_faces_found += 1
+                        distance = compute_cosine_distance(tf.embedding, face.embedding)
+                        if distance <= self.options.face_distance_threshold:
+                            temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
+                            num_faces_found += 1
                             if not roop.globals.vr_mode:
                                 break
                         del face

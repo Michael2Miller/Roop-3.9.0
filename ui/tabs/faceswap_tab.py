@@ -352,7 +352,7 @@ def on_end_face_selection():
 
 
 def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection, face_distance, blend_ratio, use_clip, clip_text, no_face_action, vr_mode, auto_rotate):
-    global SELECTED_INPUT_FACE_INDEX, is_processing
+    global SELECTED_INPUT_FACE_INDEX, SELECTED_TARGET_FACE_INDEX, is_processing
 
     from roop.core import live_swap
 
@@ -390,7 +390,7 @@ def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection
         use_clip = False
 
     roop.globals.execution_threads = roop.globals.CFG.max_threads
-    current_frame = live_swap(current_frame, roop.globals.face_swap_mode, use_clip, clip_text, SELECTED_INPUT_FACE_INDEX)
+    current_frame = live_swap(current_frame, roop.globals.face_swap_mode, use_clip, clip_text, SELECTED_TARGET_FACE_INDEX, SELECTED_INPUT_FACE_INDEX)
     if current_frame is None:
         return None, mask_offsets[0], mask_offsets[1] 
     return util.convert_to_gradio(current_frame), mask_offsets[0], mask_offsets[1]
@@ -419,7 +419,7 @@ def on_set_frame(sender:str, frame_num):
 
 def on_preview_mask(frame_num, files, clip_text):
     from roop.core import preview_mask
-    global is_processing
+    global SELECTED_TARGET_FACE_INDEX, SELECTED_INPUT_FACE_INDEX, is_processing
 
     if is_processing:
         return None
@@ -432,7 +432,7 @@ def on_preview_mask(frame_num, files, clip_text):
     if current_frame is None:
         return None
 
-    current_frame = preview_mask(current_frame, clip_text)
+    current_frame = preview_mask(current_frame, clip_text, SELECTED_TARGET_FACE_INDEX, SELECTED_INPUT_FACE_INDEX)
     return util.convert_to_gradio(current_frame)
 
 
@@ -509,7 +509,7 @@ def start_swap( enhancer, detection, keep_frames, wait_after_extraction, skip_au
     roop.globals.video_quality = roop.globals.CFG.video_quality
     roop.globals.max_memory = roop.globals.CFG.memory_limit if roop.globals.CFG.memory_limit > 0 else None
 
-    batch_process(list_files_process, use_clip, clip_text, processing_method == "In-Memory processing", progress, SELECTED_INPUT_FACE_INDEX)
+    batch_process(list_files_process, use_clip, clip_text, processing_method == "In-Memory processing", progress, SELECTED_TARGET_FACE_INDEX, SELECTED_INPUT_FACE_INDEX)
     is_processing = False
     outdir = pathlib.Path(roop.globals.output_path)
     outfiles = [item for item in outdir.rglob("*") if item.is_file()]
