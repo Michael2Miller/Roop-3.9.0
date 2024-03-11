@@ -20,7 +20,7 @@ class Enhance_GPEN():
 
     def Initialize(self, devicename):
         if self.model_gpen is None:
-            model_path = resolve_relative_path('../models/GPEN-BFR-512.onnx')
+            model_path = resolve_relative_path('../models/gpen_bfr_512.onnx')
             self.model_gpen = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
             # replace Mac mps with cpu for the moment
             devicename = devicename.replace('mps', 'cpu')
