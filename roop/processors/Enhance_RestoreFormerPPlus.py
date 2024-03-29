@@ -2,6 +2,7 @@ from typing import Any, List, Callable
 import cv2 
 import numpy as np
 import onnxruntime
+import os
 import roop.globals
 
 from roop.typing import Face, Frame, FaceSet
@@ -21,7 +22,7 @@ class Enhance_RestoreFormerPPlus():
             # replace Mac mps with cpu for the moment
             devicename = devicename.replace('mps', 'cpu')
             self.devicename = devicename
-            model_path = resolve_relative_path('../models/restoreformer_plus_plus.onnx')
+            model_path = os.path.join(roop.globals.CFG.models_directory, 'restoreformer_plus_plus.onnx')
             self.model_restoreformerpplus = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
             self.model_inputs = self.model_restoreformerpplus.get_inputs()
             model_outputs = self.model_restoreformerpplus.get_outputs()

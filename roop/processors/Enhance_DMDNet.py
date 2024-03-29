@@ -1,6 +1,8 @@
 from typing import Any, List, Callable
 import cv2 
 import numpy as np
+import os
+import roop.globals
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -194,7 +196,7 @@ class Enhance_DMDNet():
     def create(self, devicename):
         self.torchdevice = torch.device(devicename)
         model_dmdnet = DMDNet().to(self.torchdevice)
-        weights = torch.load('./models/DMDNet.pth') 
+        weights = torch.load(os.path.join(roop.globals.CFG.models_directory, 'DMDNet.pth'))
         model_dmdnet.load_state_dict(weights, strict=True)
 
         model_dmdnet.eval()

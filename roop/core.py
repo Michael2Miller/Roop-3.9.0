@@ -115,21 +115,25 @@ def pre_check() -> bool:
     if sys.version_info < (3, 9):
         update_status('Python version is not supported - please upgrade to 3.9 or higher.')
         return False
-    
-    download_directory_path = util.resolve_relative_path('../models')
+
+    if not shutil.which('ffmpeg'):
+       update_status('ffmpeg is not installed.')
+    return True
+
+
+def download_initial_models() -> None:
+    download_directory_path = roop.globals.CFG.models_directory
+    print('using folder', download_directory_path)
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/inswapper_128.onnx'])
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/GFPGANv1.4.onnx'])
     util.conditional_download(download_directory_path, ['https://github.com/csxmli2016/DMDNet/releases/download/v1/DMDNet.pth'])
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/GPEN-BFR-512.onnx'])
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/restoreformer_plus_plus.onnx'])
-    download_directory_path = util.resolve_relative_path('../models/CLIP')
-    util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/rd64-uni-refined.pth'])
-    download_directory_path = util.resolve_relative_path('../models/CodeFormer')
-    util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/CodeFormerv0.1.onnx'])
 
-    if not shutil.which('ffmpeg'):
-       update_status('ffmpeg is not installed.')
-    return True
+    util.conditional_download(os.path.join(download_directory_path, 'CLIP'), ['https://huggingface.co/countfloyd/deepfake/resolve/main/rd64-uni-refined.pth'])
+
+    util.conditional_download(os.path.join(download_directory_path, 'CodeFormer'), ['https://huggingface.co/countfloyd/deepfake/resolve/main/CodeFormerv0.1.onnx'])
+
 
 def set_display_ui(function):
     global call_display_ui
@@ -364,4 +368,5 @@ def run() -> None:
     roop.globals.video_encoder = roop.globals.CFG.output_video_codec
     roop.globals.video_quality = roop.globals.CFG.video_quality
     roop.globals.max_memory = roop.globals.CFG.memory_limit if roop.globals.CFG.memory_limit > 0 else None
+    download_initial_models()
     main.run()

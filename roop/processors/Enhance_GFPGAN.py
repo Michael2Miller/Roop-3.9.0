@@ -2,6 +2,7 @@ from typing import Any, List, Callable
 import cv2 
 import numpy as np
 import onnxruntime
+import os
 import roop.globals
 
 from roop.typing import Face, Frame, FaceSet
@@ -23,7 +24,7 @@ class Enhance_GFPGAN():
 
     def Initialize(self, devicename):
         if self.model_gfpgan is None:
-            model_path = resolve_relative_path('../models/GFPGANv1.4.onnx')
+            model_path = os.path.join(roop.globals.CFG.models_directory, 'GFPGANv1.4.onnx')
             self.model_gfpgan = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
             # replace Mac mps with cpu for the moment
             devicename = devicename.replace('mps', 'cpu')

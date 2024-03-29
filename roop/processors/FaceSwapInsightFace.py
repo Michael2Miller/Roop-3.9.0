@@ -3,6 +3,7 @@ import roop.globals
 import insightface
 import cv2
 import numpy as np
+import os
 
 from roop.typing import Face, Frame
 from roop.utilities import resolve_relative_path
@@ -19,7 +20,7 @@ class FaceSwapInsightFace():
 
     def Initialize(self, devicename):
         if self.model_swap_insightface is None:
-            model_path = resolve_relative_path('../models/inswapper_128.onnx')
+            model_path = os.path.join(roop.globals.CFG.models_directory, 'inswapper_128.onnx')
             self.model_swap_insightface = insightface.model_zoo.get_model(model_path, providers=roop.globals.execution_providers)
 
     

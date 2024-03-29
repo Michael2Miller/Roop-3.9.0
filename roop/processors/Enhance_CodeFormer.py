@@ -4,6 +4,7 @@ import threading
 import numpy as np
 import onnxruntime
 import onnx
+import os
 import roop.globals
 
 from roop.typing import Face, Frame, FaceSet
@@ -26,7 +27,7 @@ class Enhance_CodeFormer():
             # replace Mac mps with cpu for the moment
             devicename = devicename.replace('mps', 'cpu')
             self.devicename = devicename
-            model_path = resolve_relative_path('../models/CodeFormer/CodeFormerv0.1.onnx')
+            model_path = os.path.join(roop.globals.CFG.models_directory, 'CodeFormer/CodeFormerv0.1.onnx')
             self.model_codeformer = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
             self.model_inputs = self.model_codeformer.get_inputs()
             model_outputs = self.model_codeformer.get_outputs()

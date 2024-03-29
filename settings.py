@@ -1,4 +1,5 @@
 import yaml
+import roop.utilities as util
 
 class Settings:
     def __init__(self, config_file):
@@ -12,7 +13,6 @@ class Settings:
         except:
             pass
         return value
-
 
     def load(self):
         try:
@@ -36,10 +36,7 @@ class Settings:
         self.force_cpu = self.default_get(data, 'force_cpu', False)
         self.output_template = self.default_get(data, 'output_template', '{file}_{time}')
         self.use_os_temp_folder = self.default_get(data, 'use_os_temp_folder', False)
-
-
-
-
+        self.models_directory = self.default_get(data, 'models_directory', util.resolve_relative_path('../models'))
 
     def save(self):
         data = {
@@ -47,20 +44,18 @@ class Settings:
             'server_name': self.server_name,
             'server_port': self.server_port,
             'server_share': self.server_share,
-            'output_image_format' : self.output_image_format,
-            'output_video_format' : self.output_video_format,
-            'output_video_codec' : self.output_video_codec,
-            'video_quality' : self.video_quality,
-            'clear_output' : self.clear_output,
-            'max_threads' : self.max_threads,
-            'memory_limit' : self.memory_limit,
-            'provider' : self.provider,
-            'force_cpu' : self.force_cpu,
-			'output_template' : self.output_template,
-            'use_os_temp_folder' : self.use_os_temp_folder
+            'output_image_format': self.output_image_format,
+            'output_video_format': self.output_video_format,
+            'output_video_codec': self.output_video_codec,
+            'video_quality': self.video_quality,
+            'clear_output': self.clear_output,
+            'max_threads': self.max_threads,
+            'memory_limit': self.memory_limit,
+            'provider': self.provider,
+            'force_cpu': self.force_cpu,
+            'output_template': self.output_template,
+            'use_os_temp_folder': self.use_os_temp_folder,
+            'models_directory': self.models_directory,
         }
         with open(self.config_file, 'w') as f:
             yaml.dump(data, f)
-
-
-

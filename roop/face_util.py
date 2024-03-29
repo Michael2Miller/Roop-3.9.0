@@ -1,6 +1,7 @@
 import threading
 from typing import Any
 import insightface
+import os
 
 import roop.globals
 from roop.typing import Frame, Face
@@ -144,7 +145,7 @@ def get_face_swapper() -> Any:
 
     with THREAD_LOCK_SWAPPER:
         if FACE_SWAPPER is None:
-            model_path = resolve_relative_path("../models/inswapper_128.onnx")
+            model_path = os.path.join(roop.globals.CFG.models_directory, "inswapper_128.onnx")
             FACE_SWAPPER = insightface.model_zoo.get_model(
                 model_path, providers=roop.globals.execution_providers
             )
@@ -152,7 +153,7 @@ def get_face_swapper() -> Any:
 
 
 def pre_check() -> bool:
-    download_directory_path = resolve_relative_path("../models")
+    download_directory_path = roop.globals.CFG.models_directory
     conditional_download(
         download_directory_path,
         ["https://huggingface.co/countfloyd/deepfake/resolve/main/inswapper_128.onnx"],

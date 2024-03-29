@@ -6,6 +6,7 @@ import threading
 from torchvision import transforms
 from clip.clipseg import CLIPDensePredT
 import numpy as np
+import roop.globals
 
 from roop.typing import Frame
 
@@ -24,7 +25,7 @@ class Mask_Clip2Seg():
         if self.model_clip is None:
             self.model_clip = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, complex_trans_conv=True)
             self.model_clip.eval();
-            self.model_clip.load_state_dict(torch.load('models/CLIP/rd64-uni-refined.pth', map_location=torch.device('cpu')), strict=False)
+            self.model_clip.load_state_dict(torch.load(os.path.join(roop.globals.CFG.models_directory, 'CLIP/rd64-uni-refined.pth'), map_location=torch.device('cpu')), strict=False)
 
         device = torch.device(devicename)
         self.model_clip.to(device)

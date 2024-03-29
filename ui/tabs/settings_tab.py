@@ -21,6 +21,7 @@ def settings_tab():
         with gr.Row():
             with gr.Column():
                 themes = gr.Dropdown(available_themes, label="Theme", info="Change needs complete restart", value=roop.globals.CFG.selected_theme)
+                input_models_directory = gr.Textbox(label="Models directory", lines=1, info="default: models directory within repo", value=roop.globals.CFG.models_directory)
             with gr.Column():
                 settings_controls.append(gr.Checkbox(label="Public Server", value=roop.globals.CFG.server_share, elem_id='server_share', interactive=True))
                 settings_controls.append(gr.Checkbox(label='Clear output folder before each run', value=roop.globals.CFG.clear_output, elem_id='clear_output', interactive=True))
@@ -60,7 +61,7 @@ def settings_tab():
 
     # button_clean_temp.click(fn=clean_temp, outputs=[bt_srcfiles, input_faces, target_faces, bt_destfiles])
     button_clean_temp.click(fn=clean_temp)
-    button_apply_settings.click(apply_settings, inputs=[themes, input_server_name, input_server_port, output_template])
+    button_apply_settings.click(apply_settings, inputs=[themes, input_server_name, input_server_port, output_template, input_models_directory])
     button_apply_restart.click(restart)
 
 
@@ -113,13 +114,15 @@ def clean_temp():
     return None,None,None,None
 
 
-def apply_settings(themes, input_server_name, input_server_port, output_template):
+def apply_settings(themes, input_server_name, input_server_port, output_template, models_directory):
     from ui.main import show_msg
 
     roop.globals.CFG.selected_theme = themes
     roop.globals.CFG.server_name = input_server_name
     roop.globals.CFG.server_port = input_server_port
     roop.globals.CFG.output_template = output_template
+    roop.globals.CFG.models_directory = models_directory
+
     roop.globals.CFG.save()
     show_msg('Settings saved')
 
