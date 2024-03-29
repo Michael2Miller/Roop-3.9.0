@@ -123,7 +123,6 @@ def pre_check() -> bool:
 
 def download_initial_models() -> None:
     download_directory_path = roop.globals.CFG.models_directory
-    print('using folder', download_directory_path)
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/inswapper_128.onnx'])
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/GFPGANv1.4.onnx'])
     util.conditional_download(download_directory_path, ['https://github.com/csxmli2016/DMDNet/releases/download/v1/DMDNet.pth'])
