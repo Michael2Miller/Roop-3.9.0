@@ -30,12 +30,14 @@ class Settings:
         self.output_video_codec = self.default_get(data, 'output_video_codec', 'libx264')
         self.video_quality = self.default_get(data, 'video_quality', 14)
         self.clear_output = self.default_get(data, 'clear_output', True)
-        self.live_cam_start_active = self.default_get(data, 'live_cam_start_active', False)
         self.max_threads = self.default_get(data, 'max_threads', 2)
         self.memory_limit = self.default_get(data, 'memory_limit', 0)
         self.provider = self.default_get(data, 'provider', 'cuda')
         self.force_cpu = self.default_get(data, 'force_cpu', False)
         self.output_template = self.default_get(data, 'output_template', '{file}_{time}')
+        self.use_os_temp_folder = self.default_get(data, 'use_os_temp_folder', False)
+        self.output_show_video = self.default_get(data, 'output_show_video', True)
+
 
 
 
@@ -51,12 +53,13 @@ class Settings:
             'output_video_codec' : self.output_video_codec,
             'video_quality' : self.video_quality,
             'clear_output' : self.clear_output,
-            'live_cam_start_active' : self.live_cam_start_active,
             'max_threads' : self.max_threads,
             'memory_limit' : self.memory_limit,
             'provider' : self.provider,
             'force_cpu' : self.force_cpu,
-			'output_template' : self.output_template
+			'output_template' : self.output_template,
+            'use_os_temp_folder' : self.use_os_temp_folder,
+            'output_show_video' : self.output_show_video
         }
         with open(self.config_file, 'w') as f:
             yaml.dump(data, f)

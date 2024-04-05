@@ -9,6 +9,8 @@ target_folder_path = None
 frame_processors: List[str] = []
 keep_fps = None
 keep_frames = None
+autorotate_faces = None
+vr_mode = None
 skip_audio = None
 wait_after_extraction = None
 many_faces = None
@@ -31,12 +33,16 @@ default_det_size = True
 
 no_face_action = 0
 
-processing = False 
+processing = False
+
+g_current_face_analysis = None
+g_desired_face_analysis = None
 
 FACE_ENHANCER = None
 
 INPUT_FACESETS = []
 TARGET_FACES = []
+
 
 IMAGE_CHAIN_PROCESSOR = None
 VIDEO_CHAIN_PROCESSOR = None

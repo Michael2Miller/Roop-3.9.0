@@ -5,11 +5,12 @@ import psutil
 
 from roop.ProcessOptions import ProcessOptions
 
-from roop.face_util import get_first_face, get_all_faces, rotate_image_180
+from roop.face_util import get_first_face, get_all_faces, rotate_image_180, rotate_anticlockwise, rotate_clockwise, clamp_cut_values
 from roop.utilities import compute_cosine_distance, get_device, str_to_class
+import roop.vr_util as vr
 
 from typing import Any, List, Callable
-from roop.typing import Frame
+from roop.typing import Frame, Face
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread, Lock
 from queue import Queue
@@ -37,6 +38,8 @@ class ProcessMgr():
     input_face_datas = []
     target_face_datas = []
 
+    imagemask = None
+
     processors = []
     options : ProcessOptions = None
     
@@ -59,12 +62,13 @@ class ProcessMgr():
 
 
     plugins =  { 
-    'faceswap'      : 'FaceSwapInsightFace',
-    'mask_clip2seg' : 'Mask_Clip2Seg',
-    'codeformer'    : 'Enhance_CodeFormer',
-    'gfpgan'        : 'Enhance_GFPGAN',
-    'dmdnet'        : 'Enhance_DMDNet',
-    'gpen'          : 'Enhance_GPEN',
+    'faceswap'          : 'FaceSwapInsightFace',
+    'mask_clip2seg'     : 'Mask_Clip2Seg',
+    'codeformer'        : 'Enhance_CodeFormer',
+    'gfpgan'            : 'Enhance_GFPGAN',
+    'dmdnet'            : 'Enhance_DMDNet',
+    'gpen'              : 'Enhance_GPEN',
+    'restoreformer++'   : 'Enhance_RestoreFormerPPlus',
     }
 
     def __init__(self, progress):
@@ -77,6 +81,10 @@ class ProcessMgr():
         self.target_face_datas = target_faces
         self.options = options
 
+        roop.globals.g_desired_face_analysis=["landmark_3d_68", "landmark_2d_106","detection","recognition"]
+        if options.swap_mode == "all_female" or options.swap_mode == "all_male":
+            roop.globals.g_desired_face_analysis.append("genderage")
+
         processornames = options.processors.split(",")
         devicename = get_device()
         if len(self.processors) < 1:
@@ -84,8 +92,11 @@ class ProcessMgr():
                 classname = self.plugins[pn]
                 module = 'roop.processors.' + classname
                 p = str_to_class(module, classname)
-                p.Initialize(devicename)
-                self.processors.append(p)
+                if p is not None:
+                    p.Initialize(devicename)
+                    self.processors.append(p)
+                else:
+                    print(f"Not using {module}")
         else:
             for i in range(len(self.processors) -1, -1, -1):
                 if not self.processors[i].processorname in processornames:
@@ -94,13 +105,28 @@ class ProcessMgr():
 
             for i,pn in enumerate(processornames):
                 if i >= len(self.processors) or self.processors[i].processorname != pn:
-                    p = None
                     classname = self.plugins[pn]
                     module = 'roop.processors.' + classname
                     p = str_to_class(module, classname)
-                    p.Initialize(devicename)
                     if p is not None:
+                        p.Initialize(devicename)
                         self.processors.insert(i, p)
+                    else:
+                        print(f"Not using {module}")
+
+
+        if isinstance(self.options.imagemask, dict) and self.options.imagemask.get("layers") and len(self.options.imagemask["layers"]) > 0:
+            self.options.imagemask  = self.options.imagemask.get("layers")[0]
+            # Get rid of alpha
+            self.options.imagemask = cv2.cvtColor(self.options.imagemask, cv2.COLOR_RGBA2GRAY)
+            if np.any(self.options.imagemask):
+                mo = self.input_face_datas[0].faces[0].mask_offsets
+                self.options.imagemask = self.blur_area(self.options.imagemask, mo[4], mo[5])
+                self.options.imagemask = self.options.imagemask.astype(np.float32) / 255
+                self.options.imagemask = cv2.cvtColor(self.options.imagemask, cv2.COLOR_GRAY2RGB)
+            else:
+                self.options.imagemask = None
+ 
 
 
 
@@ -125,7 +151,8 @@ class ProcessMgr():
             if not roop.globals.processing:
                 return
             
-            temp_frame = cv2.imread(f)
+            # Decode the byte array into an OpenCV image
+            temp_frame = cv2.imdecode(np.fromfile(f, dtype=np.uint8), cv2.IMREAD_COLOR)
             if temp_frame is not None:
                 resimg = self.process_frame(temp_frame)
                 if resimg is not None:
@@ -238,7 +265,6 @@ class ProcessMgr():
     def update_progress(self, progress: Any = None) -> None:
         process = psutil.Process(os.getpid())
         memory_usage = process.memory_info().rss / 1024 / 1024 / 1024
-        msg = 'memory_usage: ' + '{:.2f}'.format(memory_usage).zfill(5) + f' GB execution_threads {self.num_threads}'
         progress.set_postfix({
             'memory_usage': '{:.2f}'.format(memory_usage).zfill(5) + 'GB',
             'execution_threads': self.num_threads
@@ -259,20 +285,29 @@ class ProcessMgr():
             return faces, frame
         return None, frame
       
-
+# https://github.com/deepinsight/insightface#third-party-re-implementation-of-arcface
+# https://github.com/deepinsight/insightface/blob/master/alignment/coordinate_reg/image_infer.py
+# https://github.com/deepinsight/insightface/issues/1350
+# https://github.com/linghu8812/tensorrt_inference
 
 
     def process_frame(self, frame:Frame):
+        use_original_frame = 0
+        skip_frame = 2
+
         if len(self.input_face_datas) < 1:
             return frame
-    
         temp_frame = frame.copy()
         num_swapped, temp_frame = self.swap_faces(frame, temp_frame)
         if num_swapped > 0:
             return temp_frame
-        if roop.globals.no_face_action == 0:
+        if roop.globals.no_face_action == use_original_frame:
             return frame
-        if roop.globals.no_face_action == 2:
+        if roop.globals.no_face_action == skip_frame:
+            #This only works with in-mem processing, as it simply skips the frame.
+            #For 'extract frames' it simply leaves the unprocessed frame unprocessed and it gets used in the final output by ffmpeg.
+            #If we could delete that frame here, that'd work but that might cause ffmpeg to fail unless the frames are renamed, and I don't think we have the info on what frame it actually is?????
+            #alternatively, it could mark all the necessary frames for deletion, delete them at the end, then rename the remaining frames that might work?
             return None
         else:
             copyframe = frame.copy()
@@ -285,16 +320,17 @@ class ProcessMgr():
             return temp_frame
 
 
-
     def swap_faces(self, frame, temp_frame):
         num_faces_found = 0
+
         if self.options.swap_mode == "first":
             face = get_first_face(frame)
+
             if face is None:
                 return num_faces_found, frame
+            
             num_faces_found += 1
             temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
-
         else:
             faces = get_all_faces(frame)
             if faces is None:
@@ -307,13 +343,18 @@ class ProcessMgr():
                     del face
             
             elif self.options.swap_mode == "selected":
+                use_index = len(self.target_face_datas) == 1
                 for i,tf in enumerate(self.target_face_datas):
                     for face in faces:
                         if compute_cosine_distance(tf.embedding, face.embedding) <= self.options.face_distance_threshold:
                             if i < len(self.input_face_datas):
-                                temp_frame = self.process_face(i, face, temp_frame)
+                                if use_index:
+                                    temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
+                                else:
+                                    temp_frame = self.process_face(i, face, temp_frame)
                                 num_faces_found += 1
-                            break
+                            if not roop.globals.vr_mode:
+                                break
                         del face
             elif self.options.swap_mode == "all_female" or self.options.swap_mode == "all_male":
                 gender = 'F' if self.options.swap_mode == "all_female" else 'M'
@@ -323,19 +364,138 @@ class ProcessMgr():
                         temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
                     del face
 
+        if roop.globals.vr_mode and num_faces_found % 2 > 0:
+            # stereo image, there has to be an even number of faces
+            num_faces_found = 0
+            return num_faces_found, frame
         if num_faces_found == 0:
             return num_faces_found, frame
 
         maskprocessor = next((x for x in self.processors if x.processorname == 'clip2seg'), None)
+
+        if self.options.imagemask is not None and self.options.imagemask.shape == frame.shape:
+            temp_frame = self.simple_blend_with_mask(temp_frame, frame, self.options.imagemask)
+
         if maskprocessor is not None:
             temp_frame = self.process_mask(maskprocessor, frame, temp_frame)
         return num_faces_found, temp_frame
 
 
-    def process_face(self,face_index, target_face, frame:Frame):
+    def rotation_action(self, original_face:Face, frame:Frame):
+        (height, width) = frame.shape[:2]
+
+        bounding_box_width = original_face.bbox[2] - original_face.bbox[0]
+        bounding_box_height = original_face.bbox[3] - original_face.bbox[1]
+        horizontal_face = bounding_box_width > bounding_box_height
+
+        center_x = width // 2.0
+        start_x = original_face.bbox[0]
+        end_x = original_face.bbox[2]
+        bbox_center_x = start_x + (bounding_box_width // 2.0)
+
+        # need to leverage the array of landmarks as decribed here:
+        # https://github.com/deepinsight/insightface/tree/master/alignment/coordinate_reg
+        # basically, we should be able to check for the relative position of eyes and nose
+        # then use that to determine which way the face is actually facing when in a horizontal position
+        # and use that to determine the correct rotation_action
+
+        forehead_x = original_face.landmark_2d_106[72][0]
+        chin_x = original_face.landmark_2d_106[0][0]
+
+        if horizontal_face:
+            if chin_x < forehead_x:
+                # this is someone lying down with their face like this (:
+                return "rotate_anticlockwise"
+            elif forehead_x < chin_x:
+                # this is someone lying down with their face like this :)
+                return "rotate_clockwise"
+            if bbox_center_x >= center_x:
+                # this is someone lying down with their face in the right hand side of the frame
+                return "rotate_anticlockwise"
+            if bbox_center_x < center_x:
+                # this is someone lying down with their face in the left hand side of the frame
+                return "rotate_clockwise"
+
+        return None
+
+
+    def auto_rotate_frame(self, original_face, frame:Frame):
+        target_face = original_face
+        original_frame = frame
+
+        rotation_action = self.rotation_action(original_face, frame)
+
+        if rotation_action == "rotate_anticlockwise":
+            #face is horizontal, rotating frame anti-clockwise and getting face bounding box from rotated frame
+            frame = rotate_anticlockwise(frame)
+        elif rotation_action == "rotate_clockwise":
+            #face is horizontal, rotating frame clockwise and getting face bounding box from rotated frame
+            frame = rotate_clockwise(frame)
+
+        return target_face, frame, rotation_action
+    
+
+    def auto_unrotate_frame(self, frame:Frame, rotation_action):
+        if rotation_action == "rotate_anticlockwise":
+            return rotate_clockwise(frame)
+        elif rotation_action == "rotate_clockwise":
+            return rotate_anticlockwise(frame)
+        
+        return frame
+
+
+
+    def process_face(self,face_index, target_face:Face, frame:Frame):
         enhanced_frame = None
         inputface = self.input_face_datas[face_index].faces[0]
 
+        rotation_action = None
+        if roop.globals.autorotate_faces:
+            # check for sideways rotation of face
+            rotation_action = self.rotation_action(target_face, frame)
+            if rotation_action is not None:
+                (startX, startY, endX, endY) = target_face["bbox"].astype("int")
+                width = endX - startX
+                height = endY - startY
+                offs = int(max(width,height) * 0.25)
+                rotcutframe,startX, startY, endX, endY = self.cutout(frame, startX - offs, startY - offs, endX + offs, endY + offs)
+                if rotation_action == "rotate_anticlockwise":
+                    rotcutframe = rotate_anticlockwise(rotcutframe)
+                elif rotation_action == "rotate_clockwise":
+                    rotcutframe = rotate_clockwise(rotcutframe)
+                # rotate image and re-detect face to correct wonky landmarks
+                rotface = get_first_face(rotcutframe)
+                if rotface is None:
+                    rotation_action = None
+                else:
+                    saved_frame = frame.copy()
+                    frame = rotcutframe
+                    target_face = rotface
+
+
+
+        # if roop.globals.vr_mode:
+            # bbox = target_face.bbox
+            # [orig_width, orig_height, _] = frame.shape
+
+            # # Convert bounding box to ints
+            # x1, y1, x2, y2 = map(int, bbox)
+
+            # # Determine the center of the bounding box
+            # x_center = (x1 + x2) / 2
+            # y_center = (y1 + y2) / 2
+
+            # # Normalize coordinates to range [-1, 1]
+            # x_center_normalized = x_center / (orig_width / 2) - 1
+            # y_center_normalized = y_center / (orig_width / 2) - 1
+
+            # # Convert normalized coordinates to spherical (theta, phi)
+            # theta = x_center_normalized * 180  # Theta ranges from -180 to 180 degrees
+            # phi = -y_center_normalized * 90  # Phi ranges from -90 to 90 degrees
+
+            # img = vr.GetPerspective(frame, 90, theta, phi, 1280, 1280)  # Generate perspective image
+
+        fake_frame = None
         for p in self.processors:
             if p.type == 'swap':
                 fake_frame = p.Run(inputface, target_face, frame)
@@ -347,14 +507,21 @@ class ProcessMgr():
 
         upscale = 512
         orig_width = fake_frame.shape[1]
+
         fake_frame = cv2.resize(fake_frame, (upscale, upscale), cv2.INTER_CUBIC)
         mask_offsets = inputface.mask_offsets
+
         
         if enhanced_frame is None:
             scale_factor = int(upscale / orig_width)
             result = self.paste_upscale(fake_frame, fake_frame, target_face.matrix, frame, scale_factor, mask_offsets)
         else:
             result = self.paste_upscale(fake_frame, enhanced_frame, target_face.matrix, frame, scale_factor, mask_offsets)
+
+        if rotation_action is not None:
+            fake_frame = self.auto_unrotate_frame(result, rotation_action)
+            return self.paste_simple(fake_frame, saved_frame, startX, startY)
+        
         return result
 
         
@@ -371,66 +538,86 @@ class ProcessMgr():
             end_y = frame.shape[0]
         return frame[start_y:end_y, start_x:end_x], start_x, start_y, end_x, end_y
 
+    def paste_simple(self, src:Frame, dest:Frame, start_x, start_y):
+        end_x = start_x + src.shape[1]
+        end_y = start_y + src.shape[0]
+
+        start_x, end_x, start_y, end_y = clamp_cut_values(start_x, end_x, start_y, end_y, dest)
+        dest[start_y:end_y, start_x:end_x] = src
+        return dest
         
-    
-    # Paste back adapted from here
-    # https://github.com/fAIseh00d/refacer/blob/main/refacer.py
-    # which is revised insightface paste back code
+    def simple_blend_with_mask(self, image1, image2, mask):
+        # Blend the images
+        blended_image = image1.astype(np.float32) * (1.0 - mask) + image2.astype(np.float32) * mask
+        return blended_image.astype(np.uint8)
+
 
     def paste_upscale(self, fake_face, upsk_face, M, target_img, scale_factor, mask_offsets):
         M_scale = M * scale_factor
         IM = cv2.invertAffineTransform(M_scale)
 
         face_matte = np.full((target_img.shape[0],target_img.shape[1]), 255, dtype=np.uint8)
-        ##Generate white square sized as a upsk_face
-        img_matte = np.full((upsk_face.shape[0],upsk_face.shape[1]), 255, dtype=np.uint8)
-        if mask_offsets[0] > 0:
-            img_matte[:mask_offsets[0],:] = 0
-        if mask_offsets[1] > 0:
-            img_matte[-mask_offsets[1]:,:] = 0
+        # Generate white square sized as a upsk_face
+        img_matte = np.zeros((upsk_face.shape[0],upsk_face.shape[1]), dtype=np.uint8)
 
-        ##Transform white square back to target_img
+        w = img_matte.shape[1]
+        h = img_matte.shape[0]
+
+        top = int(mask_offsets[0] * h)
+        bottom = int(h - (mask_offsets[1] * h))
+        left = int(mask_offsets[2] * w)
+        right = int(w - (mask_offsets[3] * w))
+        img_matte[top:bottom,left:right] = 255
+
+        # Transform white square back to target_img
         img_matte = cv2.warpAffine(img_matte, IM, (target_img.shape[1], target_img.shape[0]), flags=cv2.INTER_NEAREST, borderValue=0.0) 
         ##Blacken the edges of face_matte by 1 pixels (so the mask in not expanded on the image edges)
         img_matte[:1,:] = img_matte[-1:,:] = img_matte[:,:1] = img_matte[:,-1:] = 0
 
-        #Detect the affine transformed white area
-        mask_h_inds, mask_w_inds = np.where(img_matte==255) 
-        #Calculate the size (and diagonal size) of transformed white area width and height boundaries
-        mask_h = np.max(mask_h_inds) - np.min(mask_h_inds) 
-        mask_w = np.max(mask_w_inds) - np.min(mask_w_inds)
-        mask_size = int(np.sqrt(mask_h*mask_w))
-        #Calculate the kernel size for eroding img_matte by kernel (insightface empirical guess for best size was max(mask_size//10,10))
-        # k = max(mask_size//12, 8)
-        k = max(mask_size//10, 10)
-        kernel = np.ones((k,k),np.uint8)
-        img_matte = cv2.erode(img_matte,kernel,iterations = 1)
-        #Calculate the kernel size for blurring img_matte by blur_size (insightface empirical guess for best size was max(mask_size//20, 5))
-        # k = max(mask_size//24, 4) 
-        k = max(mask_size//20, 5) 
-        kernel_size = (k, k)
-        blur_size = tuple(2*i+1 for i in kernel_size)
-        img_matte = cv2.GaussianBlur(img_matte, blur_size, 0)
-        
+        img_matte = self.blur_area(img_matte, mask_offsets[4], mask_offsets[5])
         #Normalize images to float values and reshape
         img_matte = img_matte.astype(np.float32)/255
         face_matte = face_matte.astype(np.float32)/255
         img_matte = np.minimum(face_matte, img_matte)
+        if self.options.show_mask:
+            # Additional steps for green overlay
+            green_overlay = np.zeros_like(target_img)
+            green_color = [0, 255, 0]  # RGB for green
+            for i in range(3):  # Apply green color where img_matte is not zero
+                green_overlay[:, :, i] = np.where(img_matte > 0, green_color[i], 0)        ##Transform upcaled face back to target_img
         img_matte = np.reshape(img_matte, [img_matte.shape[0],img_matte.shape[1],1]) 
-        ##Transform upcaled face back to target_img
         paste_face = cv2.warpAffine(upsk_face, IM, (target_img.shape[1], target_img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
         if upsk_face is not fake_face:
             fake_face = cv2.warpAffine(fake_face, IM, (target_img.shape[1], target_img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
             paste_face = cv2.addWeighted(paste_face, self.options.blend_ratio, fake_face, 1.0 - self.options.blend_ratio, 0)
 
-        ##Re-assemble image
+        # Re-assemble image
         paste_face = img_matte * paste_face
         paste_face = paste_face + (1-img_matte) * target_img.astype(np.float32)
-        del img_matte
-        del face_matte
-        del upsk_face
-        del fake_face
+        if self.options.show_mask:
+            # Overlay the green overlay on the final image
+            paste_face = cv2.addWeighted(paste_face.astype(np.uint8), 1 - 0.5, green_overlay, 0.5, 0)
         return paste_face.astype(np.uint8)
+
+
+    def blur_area(self, img_matte, num_erosion_iterations, blur_amount):
+        # Detect the affine transformed white area
+        mask_h_inds, mask_w_inds = np.where(img_matte==255) 
+        # Calculate the size (and diagonal size) of transformed white area width and height boundaries
+        mask_h = np.max(mask_h_inds) - np.min(mask_h_inds) 
+        mask_w = np.max(mask_w_inds) - np.min(mask_w_inds)
+        mask_size = int(np.sqrt(mask_h*mask_w))
+        # Calculate the kernel size for eroding img_matte by kernel (insightface empirical guess for best size was max(mask_size//10,10))
+        # k = max(mask_size//12, 8)
+        k = max(mask_size//(blur_amount // 2) , blur_amount // 2)
+        kernel = np.ones((k,k),np.uint8)
+        img_matte = cv2.erode(img_matte,kernel,iterations = num_erosion_iterations)
+        #Calculate the kernel size for blurring img_matte by blur_size (insightface empirical guess for best size was max(mask_size//20, 5))
+        # k = max(mask_size//24, 4) 
+        k = max(mask_size//blur_amount, blur_amount//5) 
+        kernel_size = (k, k)
+        blur_size = tuple(2*i+1 for i in kernel_size)
+        return cv2.GaussianBlur(img_matte, blur_size, 0)
 
 
     def process_mask(self, processor, frame:Frame, target:Frame):

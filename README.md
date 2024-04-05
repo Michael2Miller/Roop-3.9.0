@@ -1,6 +1,6 @@
 # roop-unleashed
 
-[Changelog](#changelog) • [Installation](#installation) • [Usage](#usage) • [Example](#example) • [FAQ](#faq)
+[Changelog](#changelog) • [Usage](#usage) • [Wiki](https://github.com/C0untFloyd/roop-unleashed/wiki)
 
 
 Uncensored Deepfakes for images and videos without training and an easy-to-use GUI.
@@ -35,25 +35,8 @@ In the event of violation of the legal and ethical requirements of the user's co
 
 ### Installation
 
-> For Windows, you need to download and install [Visual Studio](https://visualstudio.microsoft.com/de/downloads/) (in theory build-tools might work too but in my experience so far they don't). During the install, make sure to include the C++ package.
+Please refer to the Wiki.
 
-Besides that, just use the 1-click installer in releases. This will download and install everything
-in a handy conda environment. This not only installs the application but also runs it, once installed.
-
-For other OS or if you know what you're doing:
-
-- `git clone https://github.com/C0untFloyd/roop-unleashed`
-- preferably create a venv or conda environment
-- `cd roop-unleashed`
-- `pip install -r requirements.txt`
-
-Depending on your available GPU there are additional packages you need to install. Here are the instructions from the original roop page:
-
-[Using GPU Acceleration](https://github.com/s0md3v/roop/wiki/2.-Acceleration)
-
-The used GPU Provider is configured in the settings tab, no need to use cmdline arguments any more. Default is CUDA (for NVIDIA). If you change it, please restart roop-unleashed completely to allow for model reloading.
-
-For Video face-swapping you also need to have ffmpeg properly installed (having it in your PATH Env). The windows installer tries to do this automatically.  
 
 
 
@@ -72,13 +55,59 @@ Additional commandline arguments are currently unsupported and settings should b
 > Note: When you run this program for the first time, it will download some models roughly ~2Gb in size.
 
 
-### Example
-
-*Coming soon*
-
 
 
 ### Changelog
+
+**22.03.2024** v3.6.5
+
+- Bugfix: Installer pulling latest update on first installation
+- Bugfix: Regression issue, blurring/erosion missing from face swap
+- Exposed erosion and blur amounts to UI
+- Using same values for manual masking too
+
+
+**20.03.2024** v3.6.3
+
+- Bugfix: Workaround for Gradio Slider Change Bug
+- Bugfix: CSS Styling to fix Gradio Image Height Bug
+- Made face swapping mask offsets resolution independant
+- Show offset mask as overlay
+- Changed layout for masking
+
+
+**18.03.2024** v3.6.0
+
+- Updated to Gradio 4.21.0 - requiring many changes under the hood
+- New manual masking (draw the mask yourself)
+- Extras Tab, streamlined cutting/joining videos
+- Re-added face selection by gender (on-demand loading, default turned off)
+- Removed unnecessary activate live-cam option
+- Added time info to preview frame and changed frame slider event to allow faster changes
+
+
+**10.03.2024** v3.5.5
+
+- Bugfix: Installer Path Env
+- Bugfix: file attributes
+- Video processing checks for presence of ffmpeg and displays warning if not found
+- Removed gender + age detection to speed up processing. Option removed from UI
+- Replaced restoreformer with restoreformer++
+- Live Cam recoded to run separate from virtual cam and without blocking controls
+- Swapping with only 1 target face allows selecting from several input faces
+
+
+
+**08.01.2024** v3.5.0
+
+- Bugfix: wrong access options when creating folders
+- New auto rotation of horizontal faces, fixing bad landmark positions (expanded on ![PR 364](https://github.com/C0untFloyd/roop-unleashed/pull/364))
+- Simple VR Option for stereo Images/Movies, best used in selected face mode
+- Added RestoreFormer Enhancer - https://github.com/wzhouxiff/RestoreFormer
+- Bumped up package versions for onnx/Torch etc.   
+
+
+**16.10.2023** v3.3.4
 
 **11.8.2023** v2.7.0
 
@@ -99,15 +128,15 @@ Initial Gradio Version - old TkInter Version now deprecated
 
 Lots of ideas, code or pre-trained models used from the following projects:
 
-https://github.com/deepinsight/insightface
-https://github.com/s0md3v/roop
-https://github.com/AUTOMATIC1111/stable-diffusion-webui
-https://github.com/Hillobar/Rope
-https://github.com/janvarev/chain-img-processor
-https://github.com/TencentARC/GFPGAN   
-https://github.com/kadirnar/codeformer-pip
-https://github.com/csxmli2016/DMDNet
-
-
+https://github.com/deepinsight/insightface<br />
+https://github.com/s0md3v/roop<br />
+https://github.com/AUTOMATIC1111/stable-diffusion-webui<br /> 
+https://github.com/Hillobar/Rope<br />
+https://github.com/janvarev/chain-img-processor<br />
+https://github.com/TencentARC/GFPGAN<br />   
+https://github.com/kadirnar/codeformer-pip<br />
+https://github.com/csxmli2016/DMDNet<br />
+<br />
+<br />
 Thanks to all developers!
 

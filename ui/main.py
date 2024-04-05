@@ -21,7 +21,8 @@ roop.globals.use_batch = None
 def prepare_environment():
     roop.globals.output_path = os.path.abspath(os.path.join(os.getcwd(), "output"))
     os.makedirs(roop.globals.output_path, exist_ok=True)
-    os.environ["TEMP"] = os.environ["TMP"] = os.path.abspath(os.path.join(os.getcwd(), "temp"))
+    if not roop.globals.CFG.use_os_temp_folder:
+        os.environ["TEMP"] = os.environ["TMP"] = os.path.abspath(os.path.join(os.getcwd(), "temp"))
     os.makedirs(os.environ["TEMP"], exist_ok=True)
     os.environ["GRADIO_TEMP_DIR"] = os.environ["TEMP"]
 
@@ -43,8 +44,9 @@ def run():
             max-height: 238.4px;
             overflow-y: auto !important;
         }
-"""
-    uii.ui_live_cam_active = roop.globals.CFG.live_cam_start_active
+        .image-container.svelte-1l6wqyv {height: 100%}
+
+    """
 
     while run_server:
         server_name = roop.globals.CFG.server_name
@@ -74,6 +76,7 @@ def run():
         try:
             while uii.ui_restart_server == False:
                 time.sleep(1.0)
+
         except (KeyboardInterrupt, OSError):
             print("Keyboard interruption in main thread... closing server.")
             run_server = False

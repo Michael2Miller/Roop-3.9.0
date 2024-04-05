@@ -20,7 +20,7 @@ def facemgr_tab():
                         """)
         with gr.Row():
             fb_facesetfile = gr.Files(label='Faceset', file_count='single', file_types=['.fsz'], interactive=True)
-            fb_files = gr.Files(label='Input Files', interactive=True)
+            fb_files = gr.Files(label='Input Files', file_count="multiple", file_types=["image"], interactive=True)
         with gr.Row():
             with gr.Column():
                 gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(roop.globals.output_path))
@@ -51,10 +51,10 @@ def on_faceset_changed(faceset, progress=gr.Progress()):
         
     if filename.lower().endswith('fsz'):
         progress(0, desc="Retrieving faces from Faceset File", )      
-        unzipfolder = '/temp/faceset'
+        unzipfolder = os.path.join(os.environ["TEMP"], 'faceset')
         if os.path.isdir(unzipfolder):
             shutil.rmtree(unzipfolder)
-        os.makedirs(unzipfolder)
+        util.mkdir_with_umask(unzipfolder)
         util.unzip(filename, unzipfolder)
         for file in os.listdir(unzipfolder):
             if file.endswith(".png"):
