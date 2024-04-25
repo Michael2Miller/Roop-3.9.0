@@ -472,7 +472,7 @@ def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection
     return gr.Image(value=util.convert_to_gradio(current_frame), visible=True), gr.ImageEditor(visible=False), gr.Slider(info=timeinfo)
 
 def map_mask_engine(selected_mask_engine, clip_text):
-    if selected_mask_engine == "CLip2Seg":
+    if selected_mask_engine == "Clip2Seg":
         mask_engine = "mask_clip2seg"
         if clip_text is None or len(clip_text) < 1:
           mask_engine = None
